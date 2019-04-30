@@ -368,6 +368,7 @@ class GlpiService(object):
     def get_all(self):
         """ Return all content of Item in JSON format. """
 
+        # res = self.request('GET', "/Computer/?get_hateoas=1&expand_dropdowns=1&range=1-100&only_id=1&order=ASC")
         res = self.request('GET', self.uri)
         return res.json()
 
@@ -520,19 +521,28 @@ class GLPI(object):
         """
         self.api_rest.set_uri(self.item_uri)
 
-    def update_uri(self, item_name):
+    def update_uri(self, item_name,optional=None):
         """ Avoid duplicate calls in every 'Item operators' """
         if (item_name not in self.item_map):
             if item_name.startswith('/'):
                 item_name_real = item_name.split('/')[1]
-                self.item_map.update({item_name_real: item_name})
+                if optional is not None:
+                    self.item_map.update({item_name: _item_path + optional})
+                else:
+                    self.item_map.update({item_name: _item_path})
                 item_name = item_name_real
             else:
                 _item_path = '/' + item_name
-                self.item_map.update({item_name: _item_path})
+                if optional is not None:
+                    self.item_map.update({item_name: _item_path + optional})
+                else:
+                    self.item_map.update({item_name: _item_path})
 
         self.set_item(item_name)
         self.set_api_uri()
+
+    def append_uri(self, uri):
+        return self.set_item(item_name)
 
     def init_api(self):
         """ Initialize the API Rest connection """
@@ -582,17 +592,37 @@ class GLPI(object):
             return {'{}'.format(e)}
 
     # [R]EAD - Retrieve Item data
-    def get_all(self, item_name):
+    def get_all(self, item_name,optional=None):
         """ Get all resources from item_name """
+
         try:
             if not self.api_has_session():
                 self.init_api()
 
-            self.update_uri(item_name)
+            if optional is not None:
+                extra_parameters = self.evaluate_optional_parameters(optional)
+            self.update_uri(item_name,extra_parameters)
+
             return self.api_rest.get_all()
 
         except GlpiException as e:
             return {'{}'.format(e)}
+
+    def evaluate_optional_parameters(self,options):
+        """Processes additional parameters for api calls
+        http://glpi.guru-domain.gurustudio.com/apirest.php/#get-all-items
+        """
+        # /Computer/?is_deleted=0&range=0-500&get_hateoas=0
+        return_url = []
+
+
+        for key, value in options.iteritems():
+            if isinstance(value, str):
+                return_url.append("{0}={1}".format(key, value))
+
+        return "?" + "&".join(return_url)
+
+
 
     def get(self, item_name, item_id=None, sub_item=None):
         """ Get item_name and/with resource by ID """
