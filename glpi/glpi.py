@@ -368,7 +368,7 @@ class GlpiService(object):
     def get_all(self):
         """ Return all content of Item in JSON format. """
 
-        # res = self.request('GET', "/Computer/?get_hateoas=1&expand_dropdowns=1&range=1-100&only_id=1&order=ASC")
+        # res = self.request('GET', "/Computer/?get_hateoas=0&expand_dropdowns=1&range=1-2&only_id=0&order=ASC")
         res = self.request('GET', self.uri)
         return res.json()
 
@@ -388,7 +388,7 @@ class GlpiService(object):
         response = self.request('GET', path)
         return response.json()
 
-    def search_options(self, item_name):
+    def search_options(self, item_name,get_url):
         """
         List search options for an Item to be used in
         search_engine/search_query.
@@ -396,6 +396,10 @@ class GlpiService(object):
         new_uri = "%s/%s" % (self.uri, item_name)
         response = self.request('GET', new_uri, accept_json=True)
 
+        if get_url is True:
+            temp = response.json()
+            temp ['uri'] = new_uri
+            return temp
         return response.json()
 
     def search_engine(self, search_query):
@@ -599,6 +603,7 @@ class GLPI(object):
             if not self.api_has_session():
                 self.init_api()
 
+            extra_parameters= ""
             if optional is not None:
                 extra_parameters = self.evaluate_optional_parameters(optional)
             self.update_uri(item_name,extra_parameters)
@@ -656,14 +661,14 @@ class GLPI(object):
         except GlpiException as e:
             return {'{}'.format(e)}
 
-    def search_options(self, item_name):
+    def search_options(self, item_name,get_url):
         """ List GLPI APIRest Search Options """
         try:
             if not self.api_has_session():
                 self.init_api()
 
             self.update_uri('listSearchOptions')
-            return self.api_rest.search_options(item_name)
+            return self.api_rest.search_options(item_name,get_url)
 
         except GlpiException as e:
             return {'{}'.format(e)}
@@ -702,7 +707,22 @@ class GLPI(object):
         else:
             return {"message_error": "Unable to find a valid criteria."}
 
-    def search_engine(self, item_name, criteria):
+    def get_fields(self,item_name):
+        field_map = {}
+        opts = self.search_options(item_name)
+
+        try:
+            for field_id, field_opts in viewitems(opts):
+                if field_id.isdigit() and 'uid' in field_opts:
+                    # support case-insensitive strip from item_name!
+                    field_name = re.sub('^'+item_name+'.', '', field_opts['uid'],
+                                        flags=re.IGNORECASE)
+                    field_map[field_name] = int(field_id)
+            return field_map
+        except AttributeError as e:
+            return {"message_error": "ERROR: Entity '{0}' was not found".format(item_name)}
+
+    def search_engine(self, item_name, criteria,settings,get_url):
         """
         Call GLPI's search engine syntax.
 
@@ -724,7 +744,7 @@ class GLPI(object):
         # -> to avoid wrong lookups, use uid of fields, but strip item type:
         #    example: {"1": {"uid": "Computer.name"}} gets {"name": 1}
         field_map = {}
-        opts = self.search_options(item_name)
+        opts = self.search_options(item_name,get_url=None)
         for field_id, field_opts in viewitems(opts):
             if field_id.isdigit() and 'uid' in field_opts:
                 # support case-insensitive strip from item_name!
@@ -733,6 +753,10 @@ class GLPI(object):
                 field_map[field_name] = int(field_id)
 
         uri_query = "%s?" % item_name
+        return uri_query
+
+        if settings is not None:
+            uri_query +=settings
 
         for idx, c in enumerate(criteria['criteria']):
             # build field argument
@@ -767,7 +791,7 @@ class GLPI(object):
             # build searchtype argument
             # -> optional! defaults to "contains" on the server if empty
             if 'searchtype' in c and c['searchtype'] is not None:
-                uri = (uri + "&criteria[%d][searchtype]=%s".format(idx,
+                uri = (uri + "&criteria[%d][searchtype]=%s" % (idx,
                        c['searchtype']))
             else:
                 uri = uri + "&criteria[%d][searchtype]=" % (idx)
@@ -789,7 +813,8 @@ class GLPI(object):
 
             self.update_uri('search')
             # TODO: is this call correct? shouldn't this be search_engine()?
-            return self.api_rest.search_options(uri_query)
+
+            return self.api_rest.search_options(uri_query,get_url)
 
         except GlpiException as e:
             return {'{}'.format(e)}
@@ -816,6 +841,18 @@ class GLPI(object):
 
             self.update_uri(item_name)
             return self.api_rest.delete(item_id, force_purge=force_purge)
+
+        except GlpiException as e:
+            return {'{}'.format(e)}
+
+
+    def get_request_path (self,uri):
+        try:
+            if not self.api_has_session():
+                self.init_api()
+
+            self.api_rest.set_uri(uri)
+            return self.api_rest.get_all()
 
         except GlpiException as e:
             return {'{}'.format(e)}
