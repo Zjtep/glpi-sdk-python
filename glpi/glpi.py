@@ -753,10 +753,13 @@ class GLPI(object):
                 field_map[field_name] = int(field_id)
 
         uri_query = "%s?" % item_name
-        return uri_query
 
         if settings is not None:
-            uri_query +=settings
+            settings_uri = ""
+            for key, value in settings.iteritems():
+                settings_uri += "{0}={1}&".format(key, value)
+
+            uri_query +=settings_uri
 
         for idx, c in enumerate(criteria['criteria']):
             # build field argument
