@@ -31,7 +31,6 @@ if sys.version_info[0] > 2:
 else:
     from HTMLParser import HTMLParser
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -70,6 +69,7 @@ def _glpi_html_parser(content):
     It's useful to debug GLPI rest when it's not returning JSON responses. I.E:
     when MYSQL server is down, API Rest answer html errors.
     """
+
     class GlpiHTMLParser(HTMLParser):
         def __init__(self, content):
             HTMLParser.__init__(self)
@@ -158,7 +158,7 @@ class GlpiService(object):
                 if 'password' in self.vcap_service_credentials:
                     self.password = self.vcap_service_credentials['password']
                 if 'token_auth' in self.vcap_service_credentials:
-                    self.token_auth =\
+                    self.token_auth = \
                         self.vcap_service_credentials['token_auth']
                 if 'app_token' in self.vcap_service_credentials:
                     self.app_token = self.vcap_service_credentials['app_token']
@@ -167,7 +167,7 @@ class GlpiService(object):
             raise GlpiException(
                 'You must specify GLPI API-Token(app_token) to make API calls')
 
-        if (self.username is None or self.password is None)\
+        if (self.username is None or self.password is None) \
                 and self.token_auth is None:
             raise GlpiException(
                 'You must specify your username and password, or token_auth'
@@ -197,6 +197,7 @@ class GlpiService(object):
     """
     Session Token
     """
+
     def set_session_token(self):
         """ Set up new session ID """
 
@@ -208,7 +209,7 @@ class GlpiService(object):
                    "Content-Type": "application/json"}
 
         if self.token_auth is not None:
-            headers["Authorization"] = "user_token "+self.token_auth
+            headers["Authorization"] = "user_token " + self.token_auth
         else:
             auth = (self.username, self.password)
 
@@ -237,10 +238,10 @@ class GlpiService(object):
             auth = None
 
             headers = {
-                    "App-Token": self.app_token,
-                    "Content-Type": "application/json",
-                    "Session-Token": self.session
-                }
+                "App-Token": self.app_token,
+                "Content-Type": "application/json",
+                "Session-Token": self.session
+            }
 
             if self.token_auth is not None:
                 auth = self.token_auth
@@ -285,6 +286,7 @@ class GlpiService(object):
         return self.session
 
     """ Request """
+
     def request(self, method, url, accept_json=False, headers={},
                 params=None, json=None, data=None, files=None, **kwargs):
         """
@@ -297,7 +299,7 @@ class GlpiService(object):
         input_headers = _remove_null_values(headers) if headers else {}
 
         headers = CaseInsensitiveDict(
-             {'user-agent': 'glpi-sdk-python-' + __version__})
+            {'user-agent': 'glpi-sdk-python-' + __version__})
 
         if accept_json:
             headers['accept'] = 'application/json'
@@ -350,6 +352,7 @@ class GlpiService(object):
         return data_str
 
     """ Generic Items methods """
+
     # [C]REATE - Create an Item
     def create(self, data_json=None):
         """ Create an object Item. """
@@ -388,7 +391,7 @@ class GlpiService(object):
         response = self.request('GET', path)
         return response.json()
 
-    def search_options(self, item_name,get_url):
+    def search_options(self, item_name, get_url):
         """
         List search options for an Item to be used in
         search_engine/search_query.
@@ -398,7 +401,7 @@ class GlpiService(object):
 
         if get_url is True:
             temp = response.json()
-            temp ['uri'] = new_uri
+            temp['uri'] = new_uri
             return temp
         return response.json()
 
@@ -525,20 +528,20 @@ class GLPI(object):
         """
         self.api_rest.set_uri(self.item_uri)
 
-    def update_uri(self, item_name,optional=None):
+    def update_uri(self, item_name, filters=None):
         """ Avoid duplicate calls in every 'Item operators' """
         if (item_name not in self.item_map):
             if item_name.startswith('/'):
                 item_name_real = item_name.split('/')[1]
-                if optional is not None:
-                    self.item_map.update({item_name: _item_path + optional})
+                if filters is not None:
+                    self.item_map.update({item_name: _item_path + filters})
                 else:
                     self.item_map.update({item_name: _item_path})
                 item_name = item_name_real
             else:
                 _item_path = '/' + item_name
-                if optional is not None:
-                    self.item_map.update({item_name: _item_path + optional})
+                if filters is not None:
+                    self.item_map.update({item_name: _item_path + filters})
                 else:
                     self.item_map.update({item_name: _item_path})
 
@@ -596,38 +599,35 @@ class GLPI(object):
             return {'{}'.format(e)}
 
     # [R]EAD - Retrieve Item data
-    def get_all(self, item_name,optional=None):
+    def get_all(self, item_name, filters=None):
         """ Get all resources from item_name """
 
         try:
             if not self.api_has_session():
                 self.init_api()
 
-            extra_parameters= ""
-            if optional is not None:
-                extra_parameters = self.evaluate_optional_parameters(optional)
-            self.update_uri(item_name,extra_parameters)
+            extra_parameters = ""
+            if filters is not None:
+                extra_parameters = self.evaluate_optional_parameters(filters)
+            self.update_uri(item_name, extra_parameters)
 
             return self.api_rest.get_all()
 
         except GlpiException as e:
             return {'{}'.format(e)}
 
-    def evaluate_optional_parameters(self,options):
+    def evaluate_optional_parameters(self, options):
         """Processes additional parameters for api calls
         http://glpi.guru-domain.gurustudio.com/apirest.php/#get-all-items
         """
         # /Computer/?is_deleted=0&range=0-500&get_hateoas=0
         return_url = []
 
-
         for key, value in options.iteritems():
             if isinstance(value, str):
                 return_url.append("{0}={1}".format(key, value))
 
         return "?" + "&".join(return_url)
-
-
 
     def get(self, item_name, item_id=None, sub_item=None):
         """ Get item_name and/with resource by ID """
@@ -661,14 +661,14 @@ class GLPI(object):
         except GlpiException as e:
             return {'{}'.format(e)}
 
-    def search_options(self, item_name,get_url):
+    def search_options(self, item_name, get_url):
         """ List GLPI APIRest Search Options """
         try:
             if not self.api_has_session():
                 self.init_api()
 
             self.update_uri('listSearchOptions')
-            return self.api_rest.search_options(item_name,get_url)
+            return self.api_rest.search_options(item_name, get_url)
 
         except GlpiException as e:
             return {'{}'.format(e)}
@@ -707,7 +707,7 @@ class GLPI(object):
         else:
             return {"message_error": "Unable to find a valid criteria."}
 
-    def get_fields(self,item_name):
+    def get_fields(self, item_name):
         field_map = {}
         opts = self.search_options(item_name)
 
@@ -715,14 +715,14 @@ class GLPI(object):
             for field_id, field_opts in viewitems(opts):
                 if field_id.isdigit() and 'uid' in field_opts:
                     # support case-insensitive strip from item_name!
-                    field_name = re.sub('^'+item_name+'.', '', field_opts['uid'],
+                    field_name = re.sub('^' + item_name + '.', '', field_opts['uid'],
                                         flags=re.IGNORECASE)
                     field_map[field_name] = int(field_id)
             return field_map
         except AttributeError as e:
             return {"message_error": "ERROR: Entity '{0}' was not found".format(item_name)}
 
-    def search_engine(self, item_name, criteria,settings,get_url):
+    def search_engine(self, item_name, criteria, settings, get_url):
         """
         Call GLPI's search engine syntax.
 
@@ -744,11 +744,11 @@ class GLPI(object):
         # -> to avoid wrong lookups, use uid of fields, but strip item type:
         #    example: {"1": {"uid": "Computer.name"}} gets {"name": 1}
         field_map = {}
-        opts = self.search_options(item_name,get_url=None)
+        opts = self.search_options(item_name, get_url=None)
         for field_id, field_opts in viewitems(opts):
             if field_id.isdigit() and 'uid' in field_opts:
                 # support case-insensitive strip from item_name!
-                field_name = re.sub('^'+item_name+'.', '', field_opts['uid'],
+                field_name = re.sub('^' + item_name + '.', '', field_opts['uid'],
                                     flags=re.IGNORECASE)
                 field_map[field_name] = int(field_id)
 
@@ -759,7 +759,7 @@ class GLPI(object):
             for key, value in settings.iteritems():
                 settings_uri += "{0}={1}&".format(key, value)
 
-            uri_query +=settings_uri
+            uri_query += settings_uri
 
         for idx, c in enumerate(criteria['criteria']):
             # build field argument
@@ -778,11 +778,11 @@ class GLPI(object):
                 else:
                     raise GlpiInvalidArgument(
                         'Cannot map field name "' + c['field'] + '" to ' +
-                        'a field id for '+str(idx+1)+'. criterion '+str(c))
+                        'a field id for ' + str(idx + 1) + '. criterion ' + str(c))
                 uri = uri + "criteria[%d][field]=%d" % (idx, field_name)
             else:
                 raise GlpiInvalidArgument(
-                    'Missing "field" parameter for ' + str(idx+1) +
+                    'Missing "field" parameter for ' + str(idx + 1) +
                     'the criteria: ' + str(c))
 
             # build value argument
@@ -795,7 +795,7 @@ class GLPI(object):
             # -> optional! defaults to "contains" on the server if empty
             if 'searchtype' in c and c['searchtype'] is not None:
                 uri = (uri + "&criteria[%d][searchtype]=%s" % (idx,
-                       c['searchtype']))
+                                                               c['searchtype']))
             else:
                 uri = uri + "&criteria[%d][searchtype]=" % (idx)
 
@@ -803,7 +803,7 @@ class GLPI(object):
             # -> error if not present but more than one criterion
             if 'link' not in c and idx > 0:
                 raise GlpiInvalidArgument(
-                    'Missing link type for '+str(idx+1)+'. criterion '+str(c))
+                    'Missing link type for ' + str(idx + 1) + '. criterion ' + str(c))
             elif 'link' in c:
                 uri = uri + "&criteria[%d][link]=%s" % (idx, c['link'])
 
@@ -817,7 +817,7 @@ class GLPI(object):
             self.update_uri('search')
             # TODO: is this call correct? shouldn't this be search_engine()?
 
-            return self.api_rest.search_options(uri_query,get_url)
+            return self.api_rest.search_options(uri_query, get_url)
 
         except GlpiException as e:
             return {'{}'.format(e)}
@@ -848,8 +848,7 @@ class GLPI(object):
         except GlpiException as e:
             return {'{}'.format(e)}
 
-
-    def get_request_path (self,uri):
+    def get_request_path(self, uri):
         try:
             if not self.api_has_session():
                 self.init_api()
